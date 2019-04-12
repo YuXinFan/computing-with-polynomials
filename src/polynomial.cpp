@@ -2,7 +2,6 @@
 #include <fstream>
 #include <iostream>
 
-#include <cmath>
 #include "polynomial.hpp"
 
 Polynomial::Polynomial() {
@@ -25,13 +24,10 @@ Polynomial::Polynomial( const std::string & path ) {
   std::ifstream file(path);
   _coeffs = std::vector<float>();
   std::string coeff_str;
-  //std::string vector_str = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   
   while( getline(file, coeff_str, ' ') ) {
-    float coeff = stof(coeff_str);
-    _coeffs.push_back(coeff);
+    _coeffs.push_back(stof(coeff_str));
   }
-  //std::cout<<"QAQ "<<vector_str<<std::endl;
 }
 
 Polynomial::Polynomial( const Polynomial & p) {
@@ -77,11 +73,13 @@ void Polynomial::print() const {
 
 Polynomial Polynomial::operator+( const Polynomial & p ) const {
   std::vector<float> ret = std::vector<float>();
+  // Case size p1 > p2
   if ( size() >= p.size() ) {
     for ( int i = 0; i < p.size(); i++ ) {
       ret.push_back( _coeffs[i] + p._coeffs[i]);
     }
     ret.insert(ret.end(), _coeffs.begin()+p.size(), _coeffs.end());
+  // Case size p1 <= p2
   }else {
     for ( int i = 0; i < size(); i++ ) {
       ret.push_back( _coeffs[i] + p._coeffs[i]);
@@ -92,10 +90,12 @@ Polynomial Polynomial::operator+( const Polynomial & p ) const {
 }
 
 Polynomial & Polynomial::operator+=( const Polynomial & p ) {
+  // Case size p1 >= p2
   if ( size() >= p.size() ) {
     for ( int i = 0; i < p.size(); i++ ) {
       _coeffs[i] += p._coeffs[i];
     }
+  // Case size p1 < p2
   }else {
     for ( int i = 0; i < size(); i++ ) {
       _coeffs[i] += p._coeffs[i];
@@ -109,11 +109,13 @@ Polynomial & Polynomial::operator+=( const Polynomial & p ) {
 
 Polynomial Polynomial::operator-( const Polynomial & p ) const {
   std::vector<float> ret = std::vector<float>();
+  // Case size p1 >= p2
   if ( size() >= p.size() ) {
     for ( int i = 0; i < p.size(); i++ ) {
       ret.push_back( _coeffs[i] - p._coeffs[i]);
     }
     ret.insert(ret.end(), _coeffs.begin()+p.size(), _coeffs.end());
+  // Case size p1 < p2
   }else {
     for ( int i = 0; i < size(); i++ ) {
       ret.push_back( _coeffs[i] - p._coeffs[i]);
@@ -126,10 +128,12 @@ Polynomial Polynomial::operator-( const Polynomial & p ) const {
 }
 
 Polynomial & Polynomial::operator-=( const Polynomial & p ) {
+  // Case size p1 >= p2
   if ( size() >= p.size() ) {
     for ( int i = 0; i < p.size(); i++ ) {
       _coeffs[i] -= p._coeffs[i];
     }
+  // Case size p1 < p2
   }else {
     for ( int i = 0; i < size(); i++ ) {
       _coeffs[i] -= p._coeffs[i];
@@ -142,23 +146,27 @@ Polynomial & Polynomial::operator-=( const Polynomial & p ) {
 }
 
 Polynomial Polynomial::operator*( const Polynomial & p ) const {
+  // The result vector should has known size
   std::vector<float> ret = std::vector<float>(size()+p.size()-1, 0.0);
+  // Apply each coefficient to the polynomial and combine them all
   for ( int i = 0; i < size(); i ++ ) {
     for ( int j = 0; j < p.size(); j++ ) {
-      ret[i+j] += _coeffs[i]*p._coeffs[j];
+      ret[i+j] += _coeffs[i]*p[j];
     }
   }
   return Polynomial(ret);
 }
 
 Polynomial & Polynomial::operator*=( const Polynomial & p ) {
+  // The result vector should has known size
   std::vector<float> ret = std::vector<float>(size()+p.size()-1, 0.0);
+  // Apply each coefficient to the polynomial and combine them all
   for ( int i = 0; i < size(); i ++ ) {
     for ( int j = 0; j < p.size(); j++ ) {
       ret[i+j] += _coeffs[i]*p._coeffs[j];
     }
   }
-  _coeffs = std::move(ret);
+  _coeffs = ret;
   return *this;
 }
 
@@ -172,30 +180,26 @@ Polynomial Polynomial::operator*( float factor ) const {
 
 Polynomial Polynomial::compose( const Polynomial & p ) const {
   std::vector<float> ret;
-  //exit(0);
+  // Set the 1 power of p
   Polynomial p_pow_i = Polynomial(p);
-  Polynomial p_r = Polynomial(std::vector<float>{_coeffs[0]});
-  for ( int i =1; i < _coeffs.size(); i++ ) {
-    p_r += (p_pow_i * _coeffs[i]) ;
+  // Init composed poly with coefficient of 0 power
+  Polynomial composed_p = Polynomial(std::vector<float>{_coeffs[0]});
+  // From 1 power to n power, calculate power of p and add to composed_p
+  for ( int i =1; i < size(); i++ ) {
+    composed_p += (p_pow_i * _coeffs[i]) ;
     p_pow_i *= p;
   }
-  // std::cout << "COM ";
-  // for ( auto i : p_r._coeffs){
-  //   std::cout << i << " ";
-  // }
-  // std::cout << std::endl;
-
-  return p_r;
+  return composed_p;
 }
 
 float Polynomial::operator()( float x ) const {
-  float result = 0.0;
-  for ( int i = 0; i < size(); i++ ) {
-    result += _coeffs[i]*(pow(x,i));
+  // Init result with constant of polynomial
+  float result = _coeffs[0];
+  // Calculate n power of x
+  float x_pow_i = x;
+  for ( int i = 1; i < size(); i++ ) {
+    result += _coeffs[i] * x_pow_i;
+    x_pow_i*= x;
   }
-  //std::cout<< result<<std::endl;
   return result;
 }
-
-
-//TODO: implement this file

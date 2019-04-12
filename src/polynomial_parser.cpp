@@ -1,65 +1,60 @@
 #include <fstream>
-#include <iostream>
 #include <algorithm>
-#include <cmath>
 
 #include "polynomial_parser.hpp"
 
 Polynomial PolynomialParser::compute_polynomial( const std::string & filename,
                                                  std::map<std::string, Polynomial> & polys ) {
+  // Read polynomial expression and store them as "(", ")", "+/-/*", "pxx"
   std::ifstream file(filename);
   std::istreambuf_iterator<char> it(file),end;
-  std::vector<std::string> stack_expr_str = std::vector<std::string>();
+  std::vector<std::string> expr_stack = std::vector<std::string>();
   std::string pol_str = std::string();
   while(it != end) {
     if ( *it == '(' ||
-        * it == ')' ||
-        * it == '+' ||
-        * it == '-' ||
-        * it == '*') {
+         *it == ')' ||
+         *it == '+' ||
+         *it == '-' ||
+         *it == '*') {
       if ( pol_str.size() != 0 ) {
-        stack_expr_str.push_back( pol_str );
+        expr_stack.push_back( pol_str );
         pol_str.clear();
       }
-      stack_expr_str.push_back(std::string(1, *it));
+      expr_stack.push_back(std::string(1, *it));
     }else {
       pol_str.append(1, *it);
     }
     it++;
   }
-
-  std::cout <<"QBQ ";
-  for ( auto i : stack_expr_str ) {
-    std::cout << i << " ";
-  }
-  std::cout<<std::endl;
-  std::reverse(stack_expr_str.begin(), stack_expr_str.end());
-  std::cout <<"QBQ ";
-  for ( auto i : stack_expr_str ) {
-    std::cout << i << " ";
-  }
-  std::cout<<std::endl;
-  //exit(0);
+  // Reverse expression for parsing stage
+  std::reverse(expr_stack.begin(), expr_stack.end());
+  // Create a stack for parsing stage
   std::vector<std::string> stack_stack = std::vector<std::string>();
-  while ( !stack_expr_str.empty()) {
-    if (stack_expr_str.back() == ")" ) {
+  // Parse expression from left to right. As reversed expression, from back to front
+  while ( !expr_stack.empty()) {
+    // Case top is ")", reduction a "(...)"
+    if (expr_stack.back() == ")" ) {
       std::vector<std::string>::reverse_iterator it = stack_stack.rbegin();
       it++;
       // Case (p) with stack: ...(p
       //     with expr_stack: ...)
       if ( *it == "(" ) {
         // Pop ) from expr
-        stack_expr_str.pop_back();
-
+        expr_stack.pop_back();
         std::string p2_str = stack_stack.back();
         // Pop p from stack
         stack_stack.pop_back();
         // Pop ( from stack
         stack_stack.pop_back();
-        // Case p1(p2) with stack: ...p1 
+
         if ( stack_stack.empty() ) {
+          // Push p2 into stack
           stack_stack.push_back(p2_str);
-        }else if ( stack_stack.back().size() > 1 ) {
+        }else if ( stack_stack.back().size() == 1 ) {
+          stack_stack.push_back(p2_str);
+        // Case p1(p2) with stack: ...p1
+        }else {
+          // Compose p1 p2
           std::string p1_str = stack_stack.back();
           Polynomial p1 = polys[p1_str];
           Polynomial p2 = polys[p2_str];
@@ -70,88 +65,73 @@ Polynomial PolynomialParser::compute_polynomial( const std::string & filename,
           stack_stack.pop_back();
           // Push p3 into stack
           stack_stack.push_back(p3_str);
-        }else {
-          stack_stack.push_back(p2_str);
         }
       }
-    }else if (stack_expr_str.back().size() > 1){
+    // Case top is a poly
+    }else if (expr_stack.back().size() > 1){
       // Case p1 op p2 with stack: ...p1 op
       //                     expr: ...p2
       if ( stack_stack.back() == "+" ) {
         // Pop + from stack
         stack_stack.pop_back();
+
         std::string p1_str = stack_stack.back();
         Polynomial p1 = polys[p1_str];
-        // Pop p1 from stack
-        stack_stack.pop_back();
-        std::string p2_str = stack_expr_str.back();
+
+        std::string p2_str = expr_stack.back();
         Polynomial p2 = polys[p2_str];
         // Pop p2 from expr
-        stack_expr_str.pop_back();
+        expr_stack.pop_back();
+
         std::string p3_str = p1_str + "+" + p2_str;
         Polynomial p3 = p1 + p2;
         polys[p3_str] = p3;
-        // Push p3 into stack
-        stack_stack.push_back(p3_str);
+        // Change p1 to p3 in stack
+        stack_stack.back() = p3_str;
       }else if ( stack_stack.back() == "-" ) {
-        // Pop + from stack
         stack_stack.pop_back();
         std::string p1_str = stack_stack.back();
         Polynomial p1 = polys[p1_str];
-        // Pop p1 from stack
-        stack_stack.pop_back();
-        std::string p2_str = stack_expr_str.back();
+        std::string p2_str = expr_stack.back();
         Polynomial p2 = polys[p2_str];
-        // Pop p2 from expr
-        stack_expr_str.pop_back();
+        expr_stack.pop_back();
         std::string p3_str = p1_str + "-" + p2_str;
         Polynomial p3 = p1 - p2;
         polys[p3_str] = p3;
-        // Push p3 into stack
-        stack_stack.push_back(p3_str);
+        stack_stack.back() = p3_str;
       }else if ( stack_stack.back() == "*" ) {
-        // Pop + from stack
         stack_stack.pop_back();
         std::string p1_str = stack_stack.back();
         Polynomial p1 = polys[p1_str];
-        // Pop p1 from stack
-        stack_stack.pop_back();
-        std::string p2_str = stack_expr_str.back();
+        std::string p2_str = expr_stack.back();
         Polynomial p2 = polys[p2_str];
-        // Pop p2 from expr
-        stack_expr_str.pop_back();
+        expr_stack.pop_back();
         std::string p3_str = p1_str + "*" + p2_str;
         Polynomial p3 = p1 * p2;
         polys[p3_str] = p3;
-        // Push p3 into stack
-        stack_stack.push_back(p3_str);
+        stack_stack.back() = p3_str;
+      // Normal case 
       }else {
-        stack_stack.push_back( stack_expr_str.back());
-        stack_expr_str.pop_back();
-      }      
+        stack_stack.push_back( expr_stack.back());
+        expr_stack.pop_back();
+      } 
+    // Normal case     
     }else {
-      stack_stack.push_back( stack_expr_str.back());
-      stack_expr_str.pop_back();
-    }
-    
+      stack_stack.push_back( expr_stack.back());
+      expr_stack.pop_back();
+    }  
   }
-
-//   exit(0);
-  
-  Polynomial ret = polys[stack_stack.front()];
-
-  return ret;
-
+  // The one left in stack is the result polynomial
+  return polys[stack_stack.front()];
 }
 
 std::function<float(float)> PolynomialParser::compute_lambda( const std::string & filename, std::map<std::string, Polynomial> & polys) {
   scalarFct s;
-  s = [&, filename](float x)->float{
+    
   // Load expression string from path
-  std::cout<< filename <<std::endl;
   std::ifstream file(filename);
   std::istreambuf_iterator<char> it(file),end;
-  std::vector<std::string> stack_expr_str = std::vector<std::string>();
+  std::vector<std::string> expr_stack = std::vector<std::string>();
   std::string pol_str = std::string();
   while(it != end) {
     if ( *it == '(' ||
@@ -160,70 +140,67 @@ std::function<float(float)> PolynomialParser::compute_lambda( const std::string 
         * it == '-' ||
         * it == '*') {
       if ( pol_str.size() != 0 ) {
-        stack_expr_str.push_back( pol_str );
+        expr_stack.push_back( pol_str );
         pol_str.clear();
       }
-      stack_expr_str.push_back(std::string(1, *it));
+      expr_stack.push_back(std::string(1, *it));
     }else {
       pol_str.append(1, *it);
     }
     it++;
   }
   
-  // Calculate polynomial p with paramater x
-  std::function<float(Polynomial &, float)> calculateFct = [&](Polynomial p, float x){
-    float result = 0.f;
-    for (int i = 0; i < p.size(); i++ ) {
-      result += (p[i]* pow(x, i));
-    }
-    return result;
-  };
-  std::function<Polynomial(Polynomial &, Polynomial &, float)> plusFct = [&](Polynomial p1, Polynomial p2, float x)->Polynomial{
-    float result = calculateFct(p1, x) + calculateFct(p2, x);
-    return Polynomial(std::vector<float>{result});
-  };
-  std::function<Polynomial(Polynomial &, Polynomial &, float)> minusFct = [&](Polynomial p1, Polynomial p2, float x)->Polynomial{
-    float result = calculateFct(p1, x) - calculateFct(p2, x);
-    return Polynomial(std::vector<float>{result});
-  };
-  std::function<Polynomial(Polynomial &, Polynomial &, float)> mulFct = [&](Polynomial p1, Polynomial p2, float x)->Polynomial{
-    float result = calculateFct(p1, x) * calculateFct(p2, x);
-    return Polynomial(std::vector<float>{result});
-  }; 
-  #define show(x)   std::cout << "SHOW "; for(int i = 0; i < x.size(); i++) {std::cout << x[i] << " ";}std::cout<<std::endl;
-
-  std::function<Polynomial(Polynomial &, Polynomial &, float)> composeFct = [&](Polynomial p1, Polynomial p2, float x)->Polynomial{
-    show(p2);
-    show(p1);
-    float var = calculateFct(p2, x);
-    float result = calculateFct(p1, var);
-    std::cout<<var<<" "<< result<<std::endl;
-    return Polynomial(std::vector<float>{result});
-  }; 
-  std::reverse(stack_expr_str.begin(), stack_expr_str.end());
+  std::reverse(expr_stack.begin(), expr_stack.end());  
   std::vector<std::string> stack_stack = std::vector<std::string>();
-  
-  //exit(0);
-    while ( !stack_expr_str.empty()) {   
-      std::cout<<"GGG ";show(stack_expr_str);
-      std::cout<<"BBB ";show(stack_stack);
-      if (stack_expr_str.back() == ")" ) {
+
+  s = [&, expr_stack, stack_stack](float x)mutable->float {
+    // Define some lambda function for calculate value, +, -, *, compose 
+    std::function<float(Polynomial &, float)> calculateFct = [&](Polynomial p, float x){
+      float result = p[0];
+      float x_pow_i = x;
+      for (int i = 1; i < p.size(); i++ ) {
+        result += (p[i]* x_pow_i);
+        x_pow_i *= x;
+      }
+      return result;
+    };
+    std::function<Polynomial(Polynomial &, Polynomial &, float)> plusFct = [&](Polynomial p1, Polynomial p2, float x)->Polynomial{
+      float result = calculateFct(p1, x) + calculateFct(p2, x);
+      return Polynomial(std::vector<float>{result});
+    };
+    std::function<Polynomial(Polynomial &, Polynomial &, float)> minusFct = [&](Polynomial p1, Polynomial p2, float x)->Polynomial{
+      float result = calculateFct(p1, x) - calculateFct(p2, x);
+      return Polynomial(std::vector<float>{result});
+    };
+    std::function<Polynomial(Polynomial &, Polynomial &, float)> mulFct = [&](Polynomial p1, Polynomial p2, float x)->Polynomial{
+      float result = calculateFct(p1, x) * calculateFct(p2, x);
+      return Polynomial(std::vector<float>{result});
+    }; 
+    std::function<Polynomial(Polynomial &, Polynomial &, float)> composeFct = [&](Polynomial p1, Polynomial p2, float x)->Polynomial{
+      float result = calculateFct(p1, calculateFct(p2, x));
+      return Polynomial(std::vector<float>{result});
+    }; 
+    // Parse expression
+    while ( !expr_stack.empty()) {   
+      if (expr_stack.back() == ")" ) {  
         std::vector<std::string>::reverse_iterator it = stack_stack.rbegin();
         it++;  
         // Case (p) with stack: ...(p
         //     with expr_stack: ...)
         if ( *it == "(" ) {
           // Pop ) from expr
-          stack_expr_str.pop_back();
+          expr_stack.pop_back();
           std::string p2_str = stack_stack.back();
           // Pop p from stack
           stack_stack.pop_back();
           // Pop ( from stack
           stack_stack.pop_back();
-          // Case p1(p2) with stack: ...p1 
           if ( stack_stack.empty() ) {
             stack_stack.push_back(p2_str);
-          }else if ( stack_stack.back().size() > 1 ) {
+          }else if ( stack_stack.back().size() == 1 ) {
+            stack_stack.push_back(p2_str);
+          // Case p1(p2) with stack: ...p1 
+          }else {
             std::string p1_str = stack_stack.back();
             Polynomial p1 = polys[p1_str];
             Polynomial p2 = polys[p2_str];
@@ -234,22 +211,19 @@ std::function<float(float)> PolynomialParser::compute_lambda( const std::string 
             stack_stack.pop_back();
             // Push p3 into stack
             stack_stack.push_back(p3_str);
-          }else {
-            stack_stack.push_back(p2_str);
           }
         }
-      }else if (stack_expr_str.back().size() > 1){
-
-        // Case (p1-p2)(p3) with stack: ...(p1-p2
-        //                        expr: ...)p3()
-        // change stacks to stack: ...(p1(p3
-        //                   expr: ...))p3(p2-)
-        if ( stack_expr_str.size() >= 5 && stack_stack.size() >=3 ) {
-          if ( stack_expr_str[stack_expr_str.size()-2] == ")" && stack_expr_str[stack_expr_str.size()-3]== "(") {
+      }else if (expr_stack.back().size() > 1){
+        // Case (p1-p2)(p3) with stack: ...(p1-
+        //                        expr: ...)p3()p2
+        // change stacks to stack: ...(p13-
+        //                   expr: ...)p23
+        if ( expr_stack.size() >= 5 && stack_stack.size() >=3 ) {
+          if ( expr_stack[expr_stack.size()-2] == ")" && expr_stack[expr_stack.size()-3]== "(") {
             std::string p1_str = stack_stack[stack_stack.size()-2];
-            std::string p2_str = stack_expr_str.back();
+            std::string p2_str = expr_stack.back();
             std::string op = stack_stack.back();
-            std::string p3_str = stack_expr_str[stack_expr_str.size()-4];
+            std::string p3_str = expr_stack[expr_stack.size()-4];
             
             std::string p13_str = p1_str + p3_str;
             Polynomial p13 = composeFct(polys[p1_str], polys[p3_str], x);
@@ -260,9 +234,9 @@ std::function<float(float)> PolynomialParser::compute_lambda( const std::string 
             stack_stack[stack_stack.size()-2] = p13_str;
             
             for ( int i : {1,2,3,4} ) {
-              stack_expr_str.pop_back();
+              expr_stack.pop_back();
             }
-            stack_expr_str.push_back(p23_str);
+            expr_stack.push_back(p23_str);
             continue;
           }
         }
@@ -273,65 +247,49 @@ std::function<float(float)> PolynomialParser::compute_lambda( const std::string 
           stack_stack.pop_back();
           std::string p1_str = stack_stack.back();
           Polynomial p1 = polys[p1_str];
-          // Pop p1 from stack
-          stack_stack.pop_back();
-          std::string p2_str = stack_expr_str.back();
+
+          std::string p2_str = expr_stack.back();
           Polynomial p2 = polys[p2_str];
           // Pop p2 from expr
-          stack_expr_str.pop_back();
+          expr_stack.pop_back();
+          // Calculate p3
           std::string p3_str = p1_str + "+" + p2_str;
           Polynomial p3 = plusFct(p1, p2, x);
           polys[p3_str] = p3;
-          // Push p3 into stack
-          stack_stack.push_back(p3_str);
+          // Change p1 to p3 in stack
+          stack_stack.back() = p3_str;
         }else if ( stack_stack.back() == "-" ) {
-          // Pop + from stack
           stack_stack.pop_back();
           std::string p1_str = stack_stack.back();
           Polynomial p1 = polys[p1_str];
-          // Pop p1 from stack
-          stack_stack.pop_back();
-          std::string p2_str = stack_expr_str.back();
+          std::string p2_str = expr_stack.back();
           Polynomial p2 = polys[p2_str];
-          // Pop p2 from expr
-          stack_expr_str.pop_back();
+          expr_stack.pop_back();
           std::string p3_str = p1_str + "-" + p2_str;
           Polynomial p3 = minusFct(p1, p2, x);
           polys[p3_str] = p3;
-          // Push p3 into stack
-          stack_stack.push_back(p3_str);
+          stack_stack.back() = p3_str;
         }else if ( stack_stack.back() == "*" ) {
-          // Pop + from stack
-          
           stack_stack.pop_back();
           std::string p1_str = stack_stack.back();
           Polynomial p1 = polys[p1_str];
-          // Pop p1 from stack
-          stack_stack.pop_back();
-          std::string p2_str = stack_expr_str.back();
+          std::string p2_str = expr_stack.back();
           Polynomial p2 = polys[p2_str];
-          // Pop p2 from expr
-          stack_expr_str.pop_back();
+          expr_stack.pop_back();
           std::string p3_str = p1_str + "*" + p2_str;
-          
           Polynomial p3 = mulFct(p1, p2, x);
-          //exit(0);
           polys[p3_str] = p3;
-          // Push p3 into stack
-          stack_stack.push_back(p3_str);
+          stack_stack.back() = p3_str;
         }else {
-          stack_stack.push_back( stack_expr_str.back());
-          stack_expr_str.pop_back();
+          stack_stack.push_back( expr_stack.back());
+          expr_stack.pop_back();
         }      
       }else {
-        stack_stack.push_back( stack_expr_str.back());
-        stack_expr_str.pop_back();
+        stack_stack.push_back( expr_stack.back());
+        expr_stack.pop_back();
       }
-      
-    }
-    
+    }  
     return polys[stack_stack.back()][0];
   };
   return s;
 }
-//TODO: implement this file
